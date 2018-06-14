@@ -72,7 +72,7 @@ on the locale where the array variable is declared.
 pragma "use default init"
 class CS: BaseDist {
   param compressRows: bool = true;
-  param sorted: bool = true;
+  var sorted: bool = true;
 
   proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) {
     return new unmanaged CSDom(rank, idxType, this.compressRows, this.sorted, dom.stridable, _to_unmanaged(this), dom);
@@ -82,8 +82,8 @@ class CS: BaseDist {
     return new unmanaged CS(compressRows=this.compressRows,sorted=this.sorted);
   }
 
-  proc dsiEqualDMaps(that: CS(this.compressRows,this.sorted)) param {
-    return true;
+  proc dsiEqualDMaps(that: CS(this.compressRows)) param {
+    return this.sorted == that.sorted;
   }
 
   proc dsiEqualDMaps(that) param {
@@ -94,9 +94,9 @@ class CS: BaseDist {
 
 class CSDom: BaseSparseDomImpl {
   param compressRows;
-  param sorted;
+  var sorted : bool;
   param stridable;
-  var dist: unmanaged CS(compressRows,sorted);
+  var dist: unmanaged CS(compressRows);
 
   var rowRange: range(idxType, stridable=stridable);
   var colRange: range(idxType, stridable=stridable);
@@ -112,7 +112,7 @@ class CSDom: BaseSparseDomImpl {
   var idx: [nnzDom] idxType;        // would like index(parentDom.dim(1))
 
   /* Initializer */
-  proc init(param rank, type idxType, param compressRows, param sorted, param stridable, dist: unmanaged CS(compressRows,sorted), parentDom: domain) {
+  proc init(param rank, type idxType, param compressRows, sorted : bool, param stridable, dist: unmanaged CS(compressRows), parentDom: domain) {
     if (rank != 2 || parentDom.rank != 2) then
       compilerError("Only 2D sparse domains are supported by the CS distribution");
     if parentDom.idxType != idxType then
