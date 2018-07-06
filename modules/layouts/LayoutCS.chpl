@@ -278,6 +278,26 @@ class CSDom: BaseSparseDomImpl {
     return ret;
   }
 
+  proc find( row : idxType, col : idxType ) {
+    use Search;
+    var ret: (bool, idxType);
+    if this.compressRows {
+      if this.sortedIndices then
+        ret = binarySearch(idx, col, lo=startIdx(row), hi=stopIdx(row));
+      else {
+        ret = linearSearch(idx, col, lo=startIdx(row), hi=stopIdx(row));
+      }
+    } else {
+      if this.sortedIndices then
+        ret = binarySearch(idx, row, lo=startIdx(col), hi=stopIdx(col));
+      else {
+        ret = linearSearch(idx, row, lo=startIdx(col), hi=stopIdx(col));
+      }
+    }
+
+    return ret;
+  }
+
   proc dsiMember(ind: rank*idxType) {
     if parentDom.member(ind) {
       const (found, loc) = find(ind);
@@ -555,14 +575,24 @@ class CSDom: BaseSparseDomImpl {
   }
 
   iter dimIter(param d, ind) {
-    if (d != 2 && this.compressRows) {
+    /* if (d != 2 && this.compressRows) {
       compilerError("dimIter(1, ..) not supported on CS(compressRows=true) domains");
     } else if (d != 1 && !this.compressRows) {
       compilerError("dimIter(2, ..) not supported on CS(compressRows=false) domains");
-    }
+    } */
 
-    for i in startIdx[ind]..stopIdx[ind] do
-      yield idx[i];
+    // if iterating within sparse dimension
+    if (d == 2 && this.compressRows) || ( d == 1 && !this.compressRows) {
+      for i in startIdx[ind]..stopIdx[ind] do
+        yield idx[i];
+    }
+    // if iterating across sparse dimension
+    else {
+      for i in if this.compressRows then this.rowRange else this.colRange {
+        const (found,_) = if this.compressRows then  find( i, ind ) else find( ind, i );
+        if found then yield i;
+      }
+    }
   }
 
   proc dsiSerialWrite(f) {
