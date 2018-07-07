@@ -256,26 +256,7 @@ class CSDom: BaseSparseDomImpl {
   }
 
   proc find(ind: rank*idxType) {
-    use Search;
-
-    const (row, col) = ind;
-
-    var ret: (bool, idxType);
-    if this.compressRows {
-      if this.sortedIndices then
-        ret = binarySearch(idx, col, lo=startIdx(row), hi=stopIdx(row));
-      else {
-        ret = linearSearch(idx, col, lo=startIdx(row), hi=stopIdx(row));
-      }
-    } else {
-      if this.sortedIndices then
-        ret = binarySearch(idx, row, lo=startIdx(col), hi=stopIdx(col));
-      else {
-        ret = linearSearch(idx, row, lo=startIdx(col), hi=stopIdx(col));
-      }
-    }
-
-    return ret;
+    return find( ind[1], ind[2] );
   }
 
   proc find( row : idxType, col : idxType ) {
@@ -294,7 +275,6 @@ class CSDom: BaseSparseDomImpl {
         ret = linearSearch(idx, row, lo=startIdx(col), hi=stopIdx(col));
       }
     }
-
     return ret;
   }
 
@@ -575,12 +555,6 @@ class CSDom: BaseSparseDomImpl {
   }
 
   iter dimIter(param d, ind) {
-    /* if (d != 2 && this.compressRows) {
-      compilerError("dimIter(1, ..) not supported on CS(compressRows=true) domains");
-    } else if (d != 1 && !this.compressRows) {
-      compilerError("dimIter(2, ..) not supported on CS(compressRows=false) domains");
-    } */
-
     // if iterating within sparse dimension
     if (d == 2 && this.compressRows) || ( d == 1 && !this.compressRows) {
       for i in startIdx[ind]..stopIdx[ind] do
