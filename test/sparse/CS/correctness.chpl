@@ -357,6 +357,16 @@ proc main() {
   writeln('CSC-unsorted');
   writeln('---');
   writeInternals(cscuArr);
+
+  testDimIter( 13,23, true, true );
+  testDimIter( 13,23, true, false );
+  testDimIter( 13,23, false, true );
+  testDimIter( 13,23, false, false );
+
+  testDimIter( 23,13, true, true );
+  testDimIter( 23,13, true, false );
+  testDimIter( 23,13, false, true );
+  testDimIter( 23,13, false, false );
 }
 
 proc writeDSI(D) {
@@ -401,4 +411,84 @@ proc writeInternals(A) {
     write(A.domain._value.idx(i), ' ');
   }
   writeln();
+}
+
+proc pretty_print_sparse( M : [?D] ?T, print_IRV : bool = false, separate_elements : bool = true )
+where D.rank == 2
+{
+  const padding = max reduce ( [i in M] (i : string).length );
+  const format_string = "%%%ns%s".format( padding, if separate_elements then " " else "" );
+  const blank_list = [i in 1..#padding+if separate_elements then 1 else 0 ] " ";
+  const blank_string = "".join( blank_list );
+
+  for i in D.dim(1){
+    for j in D.dim(2){
+      if print_IRV || D.member((i,j))
+        then writef( format_string, M[i,j] : string );
+        else write( blank_string );
+    }
+    writeln();
+  }
+}
+
+proc testDimIter( N : int, M : int, param compressRows : bool, param sortedIndices : bool, verbose : bool = false ){
+  var D : domain(2) = {1..#N,1..#M};
+  var sparse_D : sparse subdomain(D) dmapped CS(compressRows=(compressRows : bool), sortedIndices=(sortedIndices : bool));
+
+  // tops and bottoms
+  for i in D.dim(2) {
+    sparse_D.bulkAdd( [(D.dim(1).low,i), (D.dim(1).high,i)] );
+  }
+
+  // diagonal and anti-diagonal
+  var min_range = if D.dim(1).high <= D.dim(2).high then D.dim(1) else D.dim(2);
+  var max_range = if D.dim(1).high >  D.dim(2).high then D.dim(1) else D.dim(2);
+  for i in min_range {
+    sparse_D.bulkAdd( [(i,i), (D.dim(1).high-(i-min_range.low),i) ] );
+  }
+
+  // sides
+  for i in D.dim(1) {
+    sparse_D.bulkAdd( [(i,D.dim(2).low), (i,D.dim(2).high)] );
+  }
+
+  if verbose {
+    writeln( sparse_D );
+    var A : [sparse_D] string = "X";
+    pretty_print_sparse( A );
+  }
+
+  var encountered_iter : domain(D.rank*D.idxType);
+  var encountered_col_iter : domain(D.rank*D.idxType);
+  var encountered_row_iter : domain(D.rank*D.idxType);
+  for (row,col) in sparse_D {
+    encountered_iter += (row,col);
+  }
+
+  if verbose then writeln("dimIter over columns");
+  for row in D.dim(1) {
+    for col in sparse_D.dimIter(2,row) {
+      if verbose then write( (row,col), " " );
+      if !sparse_D.member((row,col)) then halt( (compressRows, sortedIndices, (row,col), "dimIter(2,%n)".format(col) ) );
+      encountered_col_iter += (row,col);
+    }
+  }
+  if verbose then writeln("\ndimIter over rows");
+  for col in D.dim(2) {
+    for row in sparse_D.dimIter(1,col) {
+      if verbose then write( (row,col), " " );
+      assert( sparse_D.member((row,col)) );
+      if !sparse_D.member((row,col)) then halt( (compressRows, sortedIndices, (row,col), "dimIter(1,%n)".format(row) ) );
+      encountered_row_iter += (row,col);
+    }
+  }
+
+  if verbose {
+    writeln( "Encountered indices with these: ", encountered_iter );
+    writeln( "Encountered indices with dimIter( column ): ", encountered_col_iter );
+    writeln( "Encountered indices with dimIter( row ): ", encountered_row_iter );
+  }
+
+  if encountered_iter != encountered_row_iter then halt( (compressRows, sortedIndices,"encountered_iter != encountered_row_iter") );
+  if encountered_iter != encountered_col_iter then halt( (compressRows, sortedIndices,"encountered_iter != encountered_col_iter") );
 }
